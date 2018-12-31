@@ -79,7 +79,7 @@ Adafruit_PCD8544 display = Adafruit_PCD8544(CLK, DIN, DC, CE, RST);
 int  direction;
 byte  x[200], y[200];
 int  i, slength;
-int  tempx=10, tempy=10;
+//int  tempx=10, tempy=10;
 int  xx, yy;
 int  xegg, yegg;
 unsigned long time=280, beeptime=50;
@@ -113,7 +113,7 @@ void setup()   {
 
   // you can change the contrast around to adapt the display for the best viewing!
   //display.setContrast(57);
-  display.setContrast(70);
+  display.setContrast(60);
 
   // Clear the buffer.
   display.clearDisplay();
@@ -157,6 +157,19 @@ void loop()
   CheckPause();
   //flag = CheckDirection();
   CheckDirection();
+
+  movesnake();
+
+  CheckGameOver();
+
+  checkegg();
+
+}
+
+void movesnake()
+{
+  int  tempx, tempy;
+
   switch (direction) {
     case UP:    {tempy=y[0]-3;tempx=x[0];} break;
     case RIGHT: {tempx=x[0]+3;tempy=y[0];} break;
@@ -164,21 +177,13 @@ void loop()
     case LEFT:  {tempx=x[0]-3;tempy=y[0];} break;
   }
 
-  movesnake();
-  CheckGameOver();
-  checkegg();
-
-}
-
-void movesnake()
-{
   if(millis()%time==0)
   {
-    if(tempx <= 0)          {tempx = MAX_WIDTH + tempx;}
-    if(tempx >= MAX_WIDTH)  {tempx = tempx - MAX_WIDTH;}
+    if (tempx <= 0)     {tempx = xMax + tempx;}
+    if (tempx >= xMax)  {tempx = tempx - xMax;}
 
-    if(tempy <= 0)          {tempy = MAX_HEIGHT + tempy;}
-    if(tempy >= MAX_HEIGHT) {tempy = tempy - MAX_HEIGHT;}
+    if (tempy <= 0)     {tempy = yMax + tempy;}
+    if (tempy >= yMax)  {tempy = tempy - yMax;}
 
     for(i=0;i<=slength;i++)
     {
@@ -228,76 +233,67 @@ boolean CheckPause()
 
 boolean CheckDirection()
 {
-  int Button;
+  int State = HIGH;
+  int Button = 0;
+  int X=0, Y=0;
   int xAxis = analogRead(AXIS_X);
   int yAxis = analogRead(AXIS_Y);
 
-  int X=0, Y=0;
   if ((xAxis-xOrg)> 40) X= 1;
   if ((xAxis-xOrg)<-40) X=-1;
   if ((yAxis-yOrg)> 40) Y= 1;
   if ((yAxis-yOrg)<-40) Y=-1;
-  if ((X!=0)&&(Y!=0))   X=0, Y=0;
+  if ( (X!=0)&&(Y!=0) ) { X=Y=0; }
 
   //Serial.print("X = ");
   //Serial.print(X);
   //Serial.print("\tY = ");
   //Serial.println(Y);
 
-
-  for(i = UP; i <= LEFT; i++) {
-    if ( (X==0)&&(Y==0)) {
-      Button = digitalRead(i);
+  if ( (X==0)&&(Y==0)) {
+    for (Button = UP; Button <= LEFT; Button++ ) {
+      State = digitalRead(Button);
+      if (State==LOW)  break;  // for loop
     }
-    else
-    {
-      i = 0;
-      if (X==0) {
-        if (Y== 1) i=UP;
-        if (Y==-1) i=DOWN;
-      }
-      if (Y==0) {
-        if (X== 1) i=RIGHT;
-        if (X==-1) i=LEFT;
-      }
-      if (i!=0)
-        Button=LOW;
+  } else {
+    if (X==0) {
+      if (Y== 1)  { State=LOW; Button=UP;  }
+      if (Y==-1)  { State=LOW; Button=DOWN;}
     }
-    if (Button==LOW) {
-      switch(i) {
-        case UP: {
-          if(direction!=DOWN) {
-            direction = UP;
-            return true;
-          }
-        } break;
-
-        case RIGHT: {
-          if(direction!=LEFT) {
-            direction = RIGHT;
-            return true;
-          }
-        } break;
-
-        case DOWN: {
-          if(direction!=UP) {
-            direction = DOWN;
-            return true;
-          }
-        } break;
-
-        case LEFT: {
-          if(direction!=RIGHT) {
-            direction = LEFT;
-            return true;
-          }
-        } break;
-
-      }
-      break;  // for loop
+    if (Y==0) {
+      if (X== 1)  { State=LOW; Button=RIGHT;}
+      if (X==-1)  { State=LOW; Button=LEFT; }
     }
   }
 
+  if (State==LOW) {
+    switch(Button) {
+      case UP: {
+        if(direction!=DOWN) {
+          direction = UP;
+          return true;
+        }
+      } break;
+      case RIGHT: {
+        if(direction!=LEFT) {
+          direction = RIGHT;
+          return true;
+        }
+      } break;
+      case DOWN: {
+        if(direction!=UP) {
+          direction = DOWN;
+          return true;
+        }
+      } break;
+      case LEFT: {
+        if(direction!=RIGHT) {
+          direction = LEFT;
+          return true;
+        }
+      } break;
+    }
+  }
 
   return false;
 }
@@ -354,8 +350,8 @@ void checkegg()
       display.fillRect(xegg,yegg,3,3,WHITE);
       display.display();
       beep(35,beeptime);
-      xegg=random(1,MAX_WIDTH -1);
-      yegg=random(1,MAX_HEIGHT-1);
+      xegg=random(1,xMax -1);
+      yegg=random(1,yMax-1);
     }
   }
 }
