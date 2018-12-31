@@ -68,9 +68,9 @@ Adafruit_PCD8544 display = Adafruit_PCD8544(CLK, DIN, DC, CE, RST);
 #define PAUSE       6
 #define START_BUTTON     6
 #define SELECT_BUTTON    7
-#define JOYSTICK_BUTTON  8
-#define JOYSTICK_AXIS_X  A0
-#define JOYSTICK_AXIS_Y  A1
+#define K_BUTTON    8
+#define AXIS_X      A0
+#define AXIS_Y      A1
 
 
 //================================================================
@@ -85,10 +85,12 @@ int  xegg, yegg;
 unsigned long time=280, beeptime=50;
 int score=0;
 
-
+int  xOrg, yOrg;
+int  xMax, yMax;
 
 void setup()   {
   Serial.begin(9600);
+  Serial.println("Hello Computer");
 
   pinMode(UP,INPUT);      digitalWrite(UP,HIGH);
   pinMode(RIGHT,INPUT);   digitalWrite(RIGHT,HIGH);
@@ -96,14 +98,22 @@ void setup()   {
   pinMode(LEFT,INPUT);    digitalWrite(LEFT,HIGH);
   pinMode(PAUSE,INPUT);   digitalWrite(PAUSE,HIGH);
 
+  xOrg = analogRead(AXIS_X);
+  Serial.print("xOrg = ");
+  Serial.println(xOrg);
+
+  yOrg = analogRead(AXIS_Y);
+  Serial.print("yOrg = ");
+  Serial.println(yOrg);
+
   pinMode(speakerPin,OUTPUT);
 
   //Initialize Display
   display.begin();
 
   // you can change the contrast around to adapt the display for the best viewing!
-  display.setContrast(57);
-  //display.setContrast(70);
+  //display.setContrast(57);
+  display.setContrast(70);
 
   // Clear the buffer.
   display.clearDisplay();
@@ -117,9 +127,14 @@ void setup()   {
   delay(4000);
   display.clearDisplay();
 
+  xMax = display.width();
+  yMax = display.height();
+  Serial.print("xMax = ");    Serial.println(xMax);
+  Serial.print("yMax = ");    Serial.println(yMax);
+
   slength=8;
-  xegg=(display.width())/2;
-  yegg=(display.height())/2;
+  xegg=(xMax)/2;
+  yegg=(yMax)/2;
   for(i=0;i<=slength;i++)
   {
     x[i]=25-3*i;
@@ -137,58 +152,154 @@ void setup()   {
 
 void loop()
 {
+  //boolean flag=false;
+
+  CheckPause();
+  //flag = CheckDirection();
+  CheckDirection();
+  switch (direction) {
+    case UP:    {tempy=y[0]-3;tempx=x[0];} break;
+    case RIGHT: {tempx=x[0]+3;tempy=y[0];} break;
+    case DOWN:  {tempy=y[0]+3;tempx=x[0];} break;
+    case LEFT:  {tempx=x[0]-3;tempy=y[0];} break;
+  }
+
   movesnake();
+  CheckGameOver();
+  checkegg();
+
 }
 
 void movesnake()
 {
-  boolean flag=false;
-
-  flag = DirectionChanged();
-
-  if(flag==true)
-  {
-    switch (direction) {
-      case UP:    {tempy=y[0]-3;tempx=x[0];} break;
-      case RIGHT: {tempx=x[0]+3;tempy=y[0];} break;
-      case DOWN:  {tempy=y[0]+3;tempx=x[0];} break;
-      case LEFT:  {tempx=x[0]-3;tempy=y[0];} break;
-    }
-  }
-
   if(millis()%time==0)
   {
-    if(flag==false)
-    {
-      switch (direction) {
-        case UP:    {tempy=y[0]-3;tempx=x[0];} break;
-        case RIGHT: {tempx=x[0]+3;tempy=y[0];} break;
-        case DOWN:  {tempy=y[0]+3;tempx=x[0];} break;
-        case LEFT:  {tempx=x[0]-3;tempy=y[0];} break;
-        // default : {
-        //   display.clearDisplay();
-        //   display.setTextColor(BLACK);
-        //   display.setCursor(25,10);
-        //   display.setTextSize(1);
-        //   display.print("ERROR - 1");
-        //   display.display();
-        //   do {
-        //     delay(200);
-        //   } while (digitalRead(PAUSE));
-        // } break;
-      }
-    }
-    CheckGameOver();
-    checkegg();
-
     if(tempx <= 0)          {tempx = MAX_WIDTH + tempx;}
     if(tempx >= MAX_WIDTH)  {tempx = tempx - MAX_WIDTH;}
 
     if(tempy <= 0)          {tempy = MAX_HEIGHT + tempy;}
     if(tempy >= MAX_HEIGHT) {tempy = tempy - MAX_HEIGHT;}
 
+    for(i=0;i<=slength;i++)
+    {
+      xx=x[i];
+      yy=y[i];
+      x[i]=tempx;
+      y[i]=tempy;
+      tempx=xx;
+      tempy=yy;
+    }
+
     drawsnake();
   }
+}
+
+boolean CheckPause()
+{
+  if (digitalRead(PAUSE)==LOW) {
+    display.clearDisplay();
+    display.setTextColor(BLACK);
+    display.setCursor(25,10);
+    display.setTextSize(1);
+    display.print("PAUSED");
+    display.display();
+
+    delay(400);
+    do {
+      delay(100);
+    } while (digitalRead(PAUSE));
+
+    display.clearDisplay();
+    for(i=3;i>0;i--)
+    {
+      display.setCursor(25,10);
+      display.setTextSize(1);
+      display.print("READY!");
+      display.setCursor(40,30);
+      display.print(i);
+      display.display();
+      delay(1000);
+      display.clearDisplay();
+    }
+    redraw();
+  }
+  return false;
+}
+
+boolean CheckDirection()
+{
+  int Button;
+  int xAxis = analogRead(AXIS_X);
+  int yAxis = analogRead(AXIS_Y);
+
+  int X=0, Y=0;
+  if ((xAxis-xOrg)> 40) X= 1;
+  if ((xAxis-xOrg)<-40) X=-1;
+  if ((yAxis-yOrg)> 40) Y= 1;
+  if ((yAxis-yOrg)<-40) Y=-1;
+  if ((X!=0)&&(Y!=0))   X=0, Y=0;
+
+  //Serial.print("X = ");
+  //Serial.print(X);
+  //Serial.print("\tY = ");
+  //Serial.println(Y);
+
+
+  for(i = UP; i <= LEFT; i++) {
+    if ( (X==0)&&(Y==0)) {
+      Button = digitalRead(i);
+    }
+    else
+    {
+      i = 0;
+      if (X==0) {
+        if (Y== 1) i=UP;
+        if (Y==-1) i=DOWN;
+      }
+      if (Y==0) {
+        if (X== 1) i=RIGHT;
+        if (X==-1) i=LEFT;
+      }
+      if (i!=0)
+        Button=LOW;
+    }
+    if (Button==LOW) {
+      switch(i) {
+        case UP: {
+          if(direction!=DOWN) {
+            direction = UP;
+            return true;
+          }
+        } break;
+
+        case RIGHT: {
+          if(direction!=LEFT) {
+            direction = RIGHT;
+            return true;
+          }
+        } break;
+
+        case DOWN: {
+          if(direction!=UP) {
+            direction = DOWN;
+            return true;
+          }
+        } break;
+
+        case LEFT: {
+          if(direction!=RIGHT) {
+            direction = LEFT;
+            return true;
+          }
+        } break;
+
+      }
+      break;  // for loop
+    }
+  }
+
+
+  return false;
 }
 
 void CheckGameOver()
@@ -200,9 +311,15 @@ void CheckGameOver()
   {
     if(x[i]==x[0] && y[i]==y[0])
     {
+      display.clearDisplay();
+      display.setTextColor(BLACK);
+      display.setTextSize(1);
+      display.setCursor(20,12);   display.print("Game Over");
+
       bh=EEPROM.read(1);
       bl=EEPROM.read(0);
       high=(((0xff00+bh)<<8) + bl);
+      if (high == 0xffff) {high = 0;}
       if(score>high)
       {
         high=score;
@@ -211,10 +328,6 @@ void CheckGameOver()
         EEPROM.write(1,bh);
         EEPROM.write(0,bl);
       }
-      display.clearDisplay();
-      display.setTextColor(BLACK);
-      display.setTextSize(1);
-      display.setCursor(20,12);   display.print("Game Over");
       display.setCursor(15,30);   display.print("Score: ");     display.print(score);
       display.setCursor(15,40);   display.print("High: ");      display.print(high);
       display.display();
@@ -247,108 +360,8 @@ void checkegg()
   }
 }
 
-boolean DirectionChanged()
-{
-  int u, r, d, l, p;
-  u = r = d = l = p = HIGH;
-
-  for(i = UP; i <= PAUSE; i++) {
-    if (digitalRead(i)==LOW) {
-      switch(i) {
-        case UP: {
-          u=LOW;
-          if(u==LOW and direction!=DOWN)
-          {
-            direction = UP;
-            //tempx=x[0];
-            //tempy=y[0]-3;
-            return true;
-          }
-        } break;
-
-        case RIGHT: {
-          r=LOW;
-          if(r==LOW and direction!=LEFT)
-          {
-            direction = RIGHT;
-            //tempx=x[0]+3;
-            //tempy=y[0];
-            return true;
-          }
-        } break;
-
-        case DOWN: {
-          d=LOW;
-          if(d==LOW and direction!=UP)
-          {
-            direction = DOWN;
-            //tempx=x[0];
-            //tempy=y[0]+3;
-            return true;
-          }
-        } break;
-
-        case LEFT: {
-          l=LOW;
-          if(l==LOW and direction!=RIGHT)
-          {
-            direction = LEFT;
-            //tempx=x[0]-3;
-            //tempy=y[0];
-            return true;
-          }
-        } break;
-
-        case PAUSE: {
-          p=LOW;
-          if(p==LOW)
-          {
-            display.clearDisplay();
-            display.setTextColor(BLACK);
-            display.setCursor(25,10);
-            display.setTextSize(1);
-            display.print("PAUSED");
-            display.display();
-            delay(400);
-            do {
-              delay(100);
-            } while (digitalRead(PAUSE));
-
-            display.clearDisplay();
-            for(i=5;i>0;i--)
-            {
-              display.setCursor(25,10);
-              display.setTextSize(1);
-              display.print("READY!");
-              display.setCursor(40,30);
-              display.print(i);
-              display.display();
-              delay(1000);
-              display.clearDisplay();
-            }
-            redraw();
-          }
-        } break;
-
-      }
-      break;
-    }
-  }
-
-  return false;
-}
-
 void drawsnake()
 {
-  for(i=0;i<=slength;i++)
-  {
-    xx=x[i];
-    yy=y[i];
-    x[i]=tempx;
-    y[i]=tempy;
-    tempx=xx;
-    tempy=yy;
-  }
   display.fillRect(xegg,yegg,3,3,BLACK);
   display.drawCircle(x[0],y[0],1,BLACK);
   display.drawCircle(x[slength],y[slength],1,WHITE);
@@ -379,4 +392,3 @@ void beep (int freq,long tb)
     }
     delay(2);
 }
-
